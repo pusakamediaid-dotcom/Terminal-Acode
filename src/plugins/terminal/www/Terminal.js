@@ -15,10 +15,11 @@ const Terminal = {
 
         const failsafeArg = failsafe ? "--failsafe" : "";
 
-        const [initAlpine, rmWrapper, initSandbox] = await Promise.all([
+        const [initAlpine, rmWrapper, initSandbox, storageHelper] = await Promise.all([
             readAsset("init-alpine.sh"),
             readAsset("rm-wrapper.sh"),
             readAsset("init-sandbox.sh"),
+            readAsset("acode-storage.sh"),
         ]);
 
         await this.migrateLegacyHome();
@@ -37,6 +38,9 @@ const Terminal = {
         await deleteFile(`${filesDir}/alpine/bin/rm`).catch(() => {});
         await writeText(`${filesDir}/alpine/bin/rm`, rmWrapper);
         await setExec(`${filesDir}/alpine/bin/rm`, true);
+
+        await writeText(`${filesDir}/alpine/bin/acode-storage`, storageHelper);
+        await setExec(`${filesDir}/alpine/bin/acode-storage`, true);
 
         if (installing) {
             return new Promise((resolve, reject) => {
