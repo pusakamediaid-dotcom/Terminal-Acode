@@ -1,0 +1,96 @@
+name: Review APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - arena/81b3e96c-terminal-acode
+    paths-ignore:
+      - 'uploads/**'
+      - '**/*.md'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: review-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build Android review APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.14.2'
+      - name: Install Android SDK
+        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0' 'platform-tools'
+      - name: Configure isolated review identity
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          review_id = 'id.pusakamedia.terminalacode.review'
+          for filename in ('utils/config.js', 'utils/setup.js'):
+              path = Path(filename)
+              text = path.read_text()
+              old = 'const ID_PAID = "com.foxdebug.acode";'
+              if old not in text:
+                  raise SystemExit(f'Missing identity constant: {filename}')
+              path.write_text(text.replace(old, f'const ID_PAID = "{review_id}";'))
+          path = Path('config.xml')
+          text = path.read_text().replace('id="com.foxdebug.acode"', f'id="{review_id}"', 1)
+          text = text.replace('<name>Acode</name>', '<name>Terminal Acode Review</name>', 1)
+          path.write_text(text)
+          path = Path('package.json')
+          package = json.loads(path.read_text())
+          package['name'] = review_id
+          package['displayName'] = 'Terminal Acode Review'
+          path.write_text(json.dumps(package, indent=2) + '\n')
+          PY
+      - name: Test storage helper
+        run: |
+          python3 -m unittest discover -s tests/terminal -v
+          sh -n src/plugins/terminal/scripts/acode-storage.sh
+          node --check src/plugins/terminal/www/Terminal.js
+      - name: Setup Cordova and dependencies
+        run: npm run setup
+      - name: Enable optional shared storage permission declaration
+        run: node utils/storage_manager.mjs y
+      - name: Build debug APK
+        run: |
+          npm run build paid dev apk
+          test -s platforms/android/app/build/outputs/apk/debug/app-debug.apk
+      - name: Prepare artifact
+        run: |
+          mkdir -p review-artifacts
+          cp platforms/android/app/build/outputs/apk/debug/app-debug.apk review-artifacts/terminal-acode-review.apk
+          sha256sum review-artifacts/terminal-acode-review.apk > review-artifacts/SHA256SUMS.txt
+          {
+            echo '## Terminal Acode Review'
+            echo "Commit: $GITHUB_SHA"
+            echo 'Download the APK from the artifact below and extract the ZIP before installing.'
+            echo 'App ID: id.pusakamedia.terminalacode.review (separate from official Acode).'
+            echo 'Debug signing only. A new runner can use a different key: back up review data before reinstalling if Android rejects an update.'
+            echo 'Storage access must be granted manually in Android settings; Android/data is not unlocked by this permission.'
+            echo 'Terminal check: acode-storage'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: terminal-acode-review-${{ github.run_number }}
+          path: review-artifacts/
+          if-no-files-found: error
+          retention-days: 14

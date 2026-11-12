@@ -19,9 +19,13 @@ Ketersediaan fitur bergantung pada varian build dan konfigurasi. Kompatibilitas 
 
 ## Status build dan instalasi
 
-Target proyek ini adalah APK Android yang dapat dipasang sendiri, dengan proses build melalui GitHub Actions. Workflow khusus fork belum disiapkan; workflow bawaan upstream tidak otomatis siap digunakan di repository ini.
+Workflow **Review APK** (`.github/workflows/review-apk.yml`) membangun APK debug melalui GitHub Actions. Build otomatis berjalan saat perubahan kode di-push ke branch review saat ini. Setelah workflow tersedia di default branch, build juga dapat dijalankan melalui **Run workflow**.
 
-Identitas aplikasi saat ini masih mengikuti konfigurasi upstream. Sebelum dipasang berdampingan dengan Acode resmi, application ID dan alur konfigurasi build perlu disesuaikan agar tidak bentrok.
+Buka tab **Actions → Review APK**, pilih run yang berhasil, lalu unduh artifact `terminal-acode-review-…`. Ekstrak ZIP artifact dan install `terminal-acode-review.apk`. Artifact disimpan selama 14 hari. APK belum dianggap berfungsi sampai diuji pada perangkat.
+
+Workflow menggunakan nama **Terminal Acode Review** dan ID `id.pusakamedia.terminalacode.review`, terpisah dari Acode resmi. Perubahan identitas diterapkan pada workspace CI, bukan konfigurasi build lokal. Debug key dapat berubah antar-run; jika update ditolak, backup data aplikasi review sebelum uninstall dan install ulang.
+
+Untuk diagnosis penyimpanan, jalankan `acode-storage` atau `acode-storage check /sdcard/Download` di terminal. Izin akses semua file harus diaktifkan secara manual melalui pengaturan Android bila tersedia. Izin tersebut tidak otomatis membuka `/Android/data` atau data privat aplikasi lain.
 
 ## Build lokal
 
